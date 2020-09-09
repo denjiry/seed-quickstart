@@ -14,23 +14,58 @@ fn init(_: Url, _: &mut impl Orders<Msg>) -> Model {
     Model::default()
 }
 
-// ------ ------
-//     Model
-// ------ ------
+struct Model {
+    todos: BTreeMap<Ulid, Todo>,
+    new_todo_title: String,
+    selected_todo: Option<SelectedTodo>,
+    filter: Filter,
+    base_url: Url,
+}
 
-// `Model` describes our app state.
-type Model = i32;
+struct Todo {
+    id: Ulid,
+    title: String,
+    completed: bool,
+}
+
+struct SelectedTodo {
+    id: Ulid,
+    title: String,
+    input_element: ElRef<web_sys::HtmlInputElement>,
+}
+
+enum Filter {
+    All,
+    Active,
+    Completed,
+}
 
 // ------ ------
 //    Update
 // ------ ------
 
-// (Remove the line below once any of your `Msg` variants doesn't implement `Copy`.)
 #[derive(Copy, Clone)]
-// `Msg` describes the different events you can modify state with.
 enum Msg {
-    Increment,
+    UrlChanged(subs::UrlChanged),
+    NewTodoTitleChanged(String),
+
+    // ------ Basic Todo operations ------
+    CreateTodo,
+    ToggleTodo(Ulid),
+    RemoveTodo(Ulid),
+
+    // ------ Bulk operations ------
+    CheckOrUncheckAll,
+    ClearCompleted,
+
+    // ------ Selection ------
+    SelectTodo(Option<Ulid>),
+    SelectedTodoTitleChanged(String),
+    SaveSelectedTodo,
 }
+// ------ ------
+//    Update
+// ------ ------
 
 // `update` describes how to handle each `Msg`.
 fn update(msg: Msg, model: &mut Model, _: &mut impl Orders<Msg>) {
