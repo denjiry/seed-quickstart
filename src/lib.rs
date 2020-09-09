@@ -2,8 +2,9 @@
 //  - it's useful when you want to check your code with `cargo make verify`
 // but some rules are too "annoying" or are not applicable for your case.)
 #![allow(clippy::wildcard_imports)]
-
 use seed::{prelude::*, *};
+use std::collections::BTreeMap;
+use ulid::Ulid;
 
 // ------ ------
 //     Init
@@ -44,7 +45,6 @@ enum Filter {
 //    Update
 // ------ ------
 
-#[derive(Copy, Clone)]
 enum Msg {
     UrlChanged(subs::UrlChanged),
     NewTodoTitleChanged(String),
