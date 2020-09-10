@@ -1,8 +1,9 @@
-#![allow(clippy::wildcard_imports)]
 // TODO: Remove
 #![allow(dead_code, unused_variables)]
 use seed::{prelude::*, *};
 use std::collections::BTreeMap;
+use strum::IntoEnumIterator;
+use strum_macros::EnumIter;
 use ulid::Ulid;
 
 // ------ ------
@@ -71,6 +72,7 @@ struct SelectedTodo {
     input_element: ElRef<web_sys::HtmlInputElement>,
 }
 
+#[derive(Copy, Clone, Eq, PartialEq, EnumIter)]
 enum Filter {
     All,
     Active,
@@ -148,95 +150,122 @@ fn update(msg: Msg, model: &mut Model, _: &mut impl Orders<Msg>) {
 // ------ ------
 fn view(model: &Model) -> Vec<Node<Msg>> {
     nodes![
-        view_header(),
+        view_header(&model.new_todo_title),
         IF!(not(model.todos.is_empty()) => vec![
-            view_main(),
-            view_footer(),
+            view_main(&model.todos, model.selected_todo.as_ref()),
+            view_footer(&model.todos, model.filter),
         ]),
     ]
 }
 
 // ------ header ------
 
-fn view_header() -> Node<Msg> {
+fn view_header(new_todo_title: &str) -> Node<Msg> {
     header![
         C!["header"],
         h1!["todos"],
         input![
             C!["new-todo"],
-            attrs! {At::Placeholder => "What needs to be done?", At::AutoFocus => AtValue::None},
+            attrs! {At::Placeholder => "What needs to be done?",
+                    At::AutoFocus => AtValue::None,
+                    At::Value => new_todo_title,
+            },
         ]
     ]
 }
 
 // ------ main ------
 
-fn view_main() -> Node<Msg> {
-    section![C!["main"], view_toggle_all(), view_todo_list(),]
+fn view_main(todos: &BTreeMap<Ulid, Todo>, selected_todo: Option<&SelectedTodo>) -> Node<Msg> {
+    section![
+        C!["main"],
+        view_toggle_all(todos),
+        view_todo_list(todos, selected_todo),
+    ]
 }
 
-fn view_toggle_all() -> Vec<Node<Msg>> {
+fn view_toggle_all(todos: &BTreeMap<Ulid, Todo>) -> Vec<Node<Msg>> {
+    let all_completed = todos.values().all(|todo| todo.completed);
     vec![
         input![
             C!["toggle-all"],
-            attrs! {At::Id => "toggle-all", At::Type => "checkbox"}
+            attrs! {
+                At::Id => "toggle-all", At::Type => "checkbox", At::Checked => all_completed.as_at_value()
+            }
         ],
         label![attrs! {At::For => "toggle-all"}, "Mark all as complete"],
     ]
 }
 
-fn view_todo_list() -> Node<Msg> {
+fn view_todo_list(todos: &BTreeMap<Ulid, Todo>, selected_todo: Option<&SelectedTodo>) -> Node<Msg> {
     ul![
         C!["todo-list"],
-        // These are here just to show the structure of the list items
-        // List items should get the class `editing` when editing and `completed` when marked as completed
-        li![
-            C!["completed"],
-            div![
-                C!["view"],
-                input![
-                    C!["toggle"],
-                    attrs! {At::Type => "checkbox", At::Checked => AtValue::None}
+        todos.values().map(|todo| {
+            let is_selected = Some(todo.id) == selected_todo.map(|selected_todo| selected_todo.id);
+
+            li![
+                C![
+                    IF!(todo.completed => "completed"),
+                    IF!(is_selected => "editing")
                 ],
-                label!["Taste JavaScript"],
-                button![C!["destroy"]],
-            ],
-            input![
-                C!["edit"],
-                attrs! {At::Value => "Create a TodoMVC template"}
+                el_key(&todo.id),
+                div![
+                    C!["view"],
+                    input![
+                        C!["toggle"],
+                        attrs! {At::Type => "checkbox", At::Checked => todo.completed.as_at_value()}
+                    ],
+                    label![&todo.title],
+                    button![C!["destroy"]],
+                ],
+                IF!(is_selected => {
+                    let selected_todo = selected_todo.unwrap();
+                    input![C!["edit"],
+                        el_ref(&selected_todo.input_element),
+                        attrs!{At::Value => selected_todo.title},
+                    ]
+                }),
             ]
-        ],
-        li![
-            div![
-                C!["view"],
-                input![C!["toggle"], attrs! {At::Type => "checkbox"}],
-                label!["Buy a unicorn"],
-                button![C!["destroy"]],
-            ],
-            input![C!["edit"], attrs! {At::Value => "Rule the web"}]
-        ]
+        })
     ]
 }
 
 // ------ footer ------
+fn view_footer(todos: &BTreeMap<Ulid, Todo>, selected_filter: Filter) -> Node<Msg> {
+    let completed_count = todos.values().filter(|todo| todo.completed).count();
+    let active_count = todos.len() - completed_count;
 
-fn view_footer() -> Node<Msg> {
     footer![
         C!["footer"],
-        // This should be `0 items left` by default
-        span![C!["todo-count"], strong!["0"], " item left",],
-        view_filters(),
-        // Hidden if no completed items are left ↓
-        button![C!["clear-completed"], "Clear completed"]
+        span![
+            C!["todo-count"],
+            strong![active_count],
+            format!(" item{} left", if active_count == 1 { "" } else { "s" }),
+        ],
+        view_filters(selected_filter),
+        IF!(completed_count > 0 =>
+            button![C!["clear-completed"],
+                "Clear completed"
+            ]
+        )
     ]
 }
 
-fn view_filters() -> Node<Msg> {
+fn view_filters(selected_filter: Filter) -> Node<Msg> {
     ul![
         C!["filters"],
-        li![a![C!["selected"], attrs! {At::Href => "#/"}, "All",],],
-        li![a![attrs! {At::Href => "#/active"}, "Active",],],
-        li![a![attrs! {At::Href => "#/completed"}, "Completed",],],
+        Filter::iter().map(|filter| {
+            let (link, title) = match filter {
+                Filter::All => ("#/", "All"),
+                Filter::Active => ("#/active", "Active"),
+                Filter::Completed => ("#/completed", "Completed"),
+            };
+            li![a![
+                C![IF!(filter == selected_filter => "selected")],
+                attrs! {At::Href => link},
+                title,
+            ],]
+        })
     ]
 }
 
