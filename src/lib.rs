@@ -17,6 +17,7 @@ fn init(_: Url, _: &mut impl Orders<Msg>) -> Model {
         filter: Filter::All,
         base_url: Url::new(),
     }
+    .add_mock_data()
 }
 
 struct Model {
