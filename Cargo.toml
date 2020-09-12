@@ -19,9 +19,10 @@ wasm-bindgen-test = "0.3.13"
 # This commit points to Seed 0.7.0 with important fixes.
 # Replace with `seed = "0.8.0"` (or newer) once released.
 seed = { git = "https://github.com/seed-rs/seed", rev = "0a538f0" }
-ulid = "0.3.3"
+ulid = {version = "0.3.3", features = ["serde"]}
 strum = "0.18.0"
 strum_macros = "0.18.0"
+serde = "1.0.112"
 
 [profile.release]
 lto = true
