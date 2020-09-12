@@ -2,12 +2,14 @@
 #![allow(dead_code, unused_variables)]
 use seed::{prelude::*, *};
 use std::collections::BTreeMap;
+use std::convert::TryFrom;
 use std::mem;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 use ulid::Ulid;
 
 const ENTER_KEY: &str = "Enter";
+const ESCAPE_KEY: &str = "Escape";
 
 // ------ ------
 //     Init
@@ -108,7 +110,7 @@ enum Msg {
 // ------ ------
 //    Update
 // ------ ------
-fn update(msg: Msg, model: &mut Model, _: &mut impl Orders<Msg>) {
+fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
     match msg {
         Msg::UrlChanged(subs::UrlChanged(url)) => {
             log!("UrlChanged", url);
@@ -158,14 +160,41 @@ fn update(msg: Msg, model: &mut Model, _: &mut impl Orders<Msg>) {
         }
 
         // ------ Selection ------
-        Msg::SelectTodo(opt_id) => {
-            log!("SelectTodo", opt_id);
+        Msg::SelectTodo(Some(id)) => {
+            if let Some(todo) = model.todos.get(&id) {
+                let input_element = ElRef::new();
+                model.selected_todo = Some(SelectedTodo {
+                    id,
+                    title: todo.title.clone(),
+                    input_element: input_element.clone(),
+                });
+
+                let title_length = u32::try_from(todo.title.len()).expect("title length as u32");
+                orders.after_next_render(move |_| {
+                    let input_element = input_element.get().expect("input_element");
+
+                    input_element.focus().expect("focus input_element");
+
+                    input_element
+                        .set_selection_range(title_length, title_length)
+                        .expect("move cursor to the end of input_element");
+                });
+            }
+        }
+        Msg::SelectTodo(None) => {
+            model.selected_todo = None;
         }
         Msg::SelectedTodoTitleChanged(title) => {
-            log!("SelectedTodoTitleChanged", title);
+            if let Some(selected_todo) = &mut model.selected_todo {
+                selected_todo.title = title;
+            }
         }
         Msg::SaveSelectedTodo => {
-            log!("SaveSelectedTodo");
+            if let Some(selected_todo) = model.selected_todo.take() {
+                if let Some(todo) = model.todos.get_mut(&selected_todo.id) {
+                    todo.title = selected_todo.title;
+                }
+            }
         }
     }
 }
@@ -247,16 +276,27 @@ fn view_todo_list(todos: &BTreeMap<Ulid, Todo>, selected_todo: Option<&SelectedT
                         attrs! {At::Type => "checkbox", At::Checked => todo.completed.as_at_value()},
                         ev(Ev::Change, move |_| Msg::ToggleTodo(id)),
                     ],
-                    label![&todo.title],
+                    label![&todo.title,
+                           ev(Ev::DblClick, move |_| Msg::SelectTodo(Some(id))),
+                    ],
                     button![C!["destroy"],
-                            ev(Ev::Click, move |_| Msg::RemoveTodo(id))
+                            ev(Ev::Click, move |_| Msg::RemoveTodo(id)),
                     ],
                 ],
                 IF!(is_selected => {
                     let selected_todo = selected_todo.unwrap();
                     input![C!["edit"],
-                        el_ref(&selected_todo.input_element),
-                        attrs!{At::Value => selected_todo.title},
+                           el_ref(&selected_todo.input_element),
+                           attrs!{At::Value => selected_todo.title},
+                           keyboard_ev(Ev::KeyDown, |keyboard_event| {
+                               Some(match keyboard_event.key().as_str() {
+                                   ESCAPE_KEY => Msg::SelectTodo(None),
+                                   ENTER_KEY => Msg::SaveSelectedTodo,
+                                   _ => return None
+                               })
+                           }),
+                           ev(Ev::Blur, |_| Msg::SaveSelectedTodo),
+                           input_ev(Ev::Input, Msg::SelectedTodoTitleChanged),
                     ]
                 }),
             ]
