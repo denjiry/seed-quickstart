@@ -2,9 +2,12 @@
 #![allow(dead_code, unused_variables)]
 use seed::{prelude::*, *};
 use std::collections::BTreeMap;
+use std::mem;
 use strum::IntoEnumIterator;
 use strum_macros::EnumIter;
 use ulid::Ulid;
+
+const ENTER_KEY: &str = "Enter";
 
 // ------ ------
 //     Init
@@ -111,26 +114,47 @@ fn update(msg: Msg, model: &mut Model, _: &mut impl Orders<Msg>) {
             log!("UrlChanged", url);
         }
         Msg::NewTodoTitleChanged(title) => {
-            log!("NewTodoTitleChanged", title);
+            model.new_todo_title = title;
         }
 
         // ------ Basic Todo operations ------
         Msg::CreateTodo => {
-            log!("CreateTodo");
+            let title = model.new_todo_title.trim();
+            if not(title.is_empty()) {
+                let id = Ulid::new();
+                model.todos.insert(
+                    id,
+                    Todo {
+                        id,
+                        title: title.to_owned(),
+                        completed: false,
+                    },
+                );
+                model.new_todo_title.clear();
+            }
         }
         Msg::ToggleTodo(id) => {
-            log!("ToggleTodo");
+            if let Some(todo) = model.todos.get_mut(&id) {
+                todo.completed = not(todo.completed);
+            }
         }
         Msg::RemoveTodo(id) => {
-            log!("RemoveTodo");
+            model.todos.remove(&id);
         }
 
         // ------ Bulk operations ------
         Msg::CheckOrUncheckAll => {
-            log!("CheckOrUncheckAll");
+            let all_checked = model.todos.values().all(|todo| todo.completed);
+            for todo in model.todos.values_mut() {
+                todo.completed = not(all_checked);
+            }
         }
         Msg::ClearCompleted => {
-            log!("ClearCompleted");
+            // TODO: Refactor with `BTreeMap::drain_filter` once stable.
+            model.todos = mem::take(&mut model.todos)
+                .into_iter()
+                .filter(|(_, todo)| not(todo.completed))
+                .collect();
         }
 
         // ------ Selection ------
@@ -171,6 +195,10 @@ fn view_header(new_todo_title: &str) -> Node<Msg> {
                     At::AutoFocus => AtValue::None,
                     At::Value => new_todo_title,
             },
+            input_ev(Ev::Input, Msg::NewTodoTitleChanged),
+            keyboard_ev(Ev::KeyDown, |keyboard_event| {
+                IF!(keyboard_event.key() == ENTER_KEY => Msg::CreateTodo)
+            }),
         ]
     ]
 }
@@ -192,7 +220,8 @@ fn view_toggle_all(todos: &BTreeMap<Ulid, Todo>) -> Vec<Node<Msg>> {
             C!["toggle-all"],
             attrs! {
                 At::Id => "toggle-all", At::Type => "checkbox", At::Checked => all_completed.as_at_value()
-            }
+            },
+            ev(Ev::Change, |_| Msg::CheckOrUncheckAll),
         ],
         label![attrs! {At::For => "toggle-all"}, "Mark all as complete"],
     ]
@@ -202,7 +231,8 @@ fn view_todo_list(todos: &BTreeMap<Ulid, Todo>, selected_todo: Option<&SelectedT
     ul![
         C!["todo-list"],
         todos.values().map(|todo| {
-            let is_selected = Some(todo.id) == selected_todo.map(|selected_todo| selected_todo.id);
+            let id = todo.id;
+            let is_selected = Some(id) == selected_todo.map(|selected_todo| selected_todo.id);
 
             li![
                 C![
@@ -214,10 +244,13 @@ fn view_todo_list(todos: &BTreeMap<Ulid, Todo>, selected_todo: Option<&SelectedT
                     C!["view"],
                     input![
                         C!["toggle"],
-                        attrs! {At::Type => "checkbox", At::Checked => todo.completed.as_at_value()}
+                        attrs! {At::Type => "checkbox", At::Checked => todo.completed.as_at_value()},
+                        ev(Ev::Change, move |_| Msg::ToggleTodo(id)),
                     ],
                     label![&todo.title],
-                    button![C!["destroy"]],
+                    button![C!["destroy"],
+                            ev(Ev::Click, move |_| Msg::RemoveTodo(id))
+                    ],
                 ],
                 IF!(is_selected => {
                     let selected_todo = selected_todo.unwrap();
@@ -246,7 +279,8 @@ fn view_footer(todos: &BTreeMap<Ulid, Todo>, selected_filter: Filter) -> Node<Ms
         view_filters(selected_filter),
         IF!(completed_count > 0 =>
             button![C!["clear-completed"],
-                "Clear completed"
+                    "Clear completed",
+                    ev(Ev::Click, |_| Msg::ClearCompleted),
             ]
         )
     ]
