@@ -27,7 +27,7 @@ fn init(mut url: Url, orders: &mut impl Orders<Msg>) -> Model {
         todos: LocalStorage::get(STORAGE_KEY).unwrap_or_default(),
         new_todo_title: String::new(),
         selected_todo: None,
-        filter,
+        filter: Filter::from(url),
         base_url: Url::new(),
     }
 }
@@ -53,6 +53,8 @@ struct SelectedTodo {
     input_element: ElRef<web_sys::HtmlInputElement>,
 }
 
+// ------ Filter ------
+
 #[derive(Copy, Clone, Eq, PartialEq, EnumIter)]
 enum Filter {
     All,
@@ -60,6 +62,15 @@ enum Filter {
     Completed,
 }
 
+impl From<Url> for Filter {
+    fn from(mut url: Url) -> Self {
+        match url.remaining_hash_path_parts().as_slice() {
+            ["active"] => Self::Active,
+            ["completed"] => Self::Completed,
+            _ => Self::All,
+        }
+    }
+}
 // ------ ------
 //    Update
 // ------ ------
@@ -87,8 +98,8 @@ enum Msg {
 // ------ ------
 fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
     match msg {
-        Msg::UrlChanged(subs::UrlChanged(url)) => {
-            log!("UrlChanged", url);
+        Msg::UrlChanged(subs::UrlChanged(mut url)) => {
+            model.filter = Filter::from(url);
         }
         Msg::NewTodoTitleChanged(title) => {
             model.new_todo_title = title;
