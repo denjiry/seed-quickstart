@@ -1,34 +1,3 @@
-Skip to content
-Search or jump to…
-
-Pull requests
-Issues
-Marketplace
-Explore
- 
-@denjiry 
-tastejs
-/
-todomvc-app-css
-17
-153
-63
-Code
-Issues
-3
-Pull requests
-Actions
-Security
-Insights
-todomvc-app-css/index.css
-@sindresorhus
-sindresorhus More tweaks
-Latest commit c19f905 on 3 Oct 2019
- History
- 15 contributors
-@sindresorhus@hazmi@tbranyen@teberl@sun-zheng-an@samccone@passy@patrickkettner@parambirs@kasperpeulen@bahmutov@dmitriz
-380 lines (327 sloc)  6.86 KB
- 
 html,
 body {
 	margin: 0;
