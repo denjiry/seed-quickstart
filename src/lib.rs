@@ -17,7 +17,7 @@ const STORAGE_KEY: &str = "todos-seed";
 //     Init
 // ------ ------
 fn init(mut url: Url, orders: &mut impl Orders<Msg>) -> Model {
-    orders.subscribe(subs::UrlChanged);
+    orders.subscribe(Msg::UrlChanged);
     let filter = match url.remaining_hash_path_parts().as_slice() {
         ["active"] => Filter::Active,
         ["completed"] => Filter::Completed,
