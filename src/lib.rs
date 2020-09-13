@@ -16,12 +16,18 @@ const STORAGE_KEY: &str = "todos-seed";
 // ------ ------
 //     Init
 // ------ ------
-fn init(_: Url, _: &mut impl Orders<Msg>) -> Model {
+fn init(mut url: Url, orders: &mut impl Orders<Msg>) -> Model {
+    orders.subscribe(subs::UrlChanged);
+    let filter = match url.remaining_hash_path_parts().as_slice() {
+        ["active"] => Filter::Active,
+        ["completed"] => Filter::Completed,
+        _ => Filter::All,
+    };
     Model {
         todos: LocalStorage::get(STORAGE_KEY).unwrap_or_default(),
         new_todo_title: String::new(),
         selected_todo: None,
-        filter: Filter::All,
+        filter,
         base_url: Url::new(),
     }
 }
@@ -176,7 +182,7 @@ fn view(model: &Model) -> Vec<Node<Msg>> {
     nodes![
         view_header(&model.new_todo_title),
         IF!(not(model.todos.is_empty()) => vec![
-            view_main(&model.todos, model.selected_todo.as_ref()),
+            view_main(&model.todos, model.selected_todo.as_ref(), model.filter),
             view_footer(&model.todos, model.filter),
         ]),
     ]
@@ -204,11 +210,15 @@ fn view_header(new_todo_title: &str) -> Node<Msg> {
 
 // ------ main ------
 
-fn view_main(todos: &BTreeMap<Ulid, Todo>, selected_todo: Option<&SelectedTodo>) -> Node<Msg> {
+fn view_main(
+    todos: &BTreeMap<Ulid, Todo>,
+    selected_todo: Option<&SelectedTodo>,
+    filter: Filter,
+) -> Node<Msg> {
     section![
         C!["main"],
         view_toggle_all(todos),
-        view_todo_list(todos, selected_todo),
+        view_todo_list(todos, selected_todo, filter),
     ]
 }
 
@@ -226,10 +236,19 @@ fn view_toggle_all(todos: &BTreeMap<Ulid, Todo>) -> Vec<Node<Msg>> {
     ]
 }
 
-fn view_todo_list(todos: &BTreeMap<Ulid, Todo>, selected_todo: Option<&SelectedTodo>) -> Node<Msg> {
+fn view_todo_list(
+    todos: &BTreeMap<Ulid, Todo>,
+    selected_todo: Option<&SelectedTodo>,
+    filter: Filter,
+) -> Node<Msg> {
+    let todos = todos.values().filter(|todo| match filter {
+        Filter::All => true,
+        Filter::Active => not(todo.completed),
+        Filter::Completed => todo.completed,
+    });
     ul![
         C!["todo-list"],
-        todos.values().map(|todo| {
+        todos.map(|todo| {
             let id = todo.id;
             let is_selected = Some(id) == selected_todo.map(|selected_todo| selected_todo.id);
 
