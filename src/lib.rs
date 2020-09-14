@@ -1,5 +1,3 @@
-// TODO: Remove
-#![allow(dead_code, unused_variables)]
 use seed::{prelude::*, *};
 use serde::{Deserialize, Serialize};
 use std::collections::BTreeMap;
@@ -20,7 +18,7 @@ const COMPLETED: &str = "completed";
 // ------ ------
 //     Init
 // ------ ------
-fn init(mut url: Url, orders: &mut impl Orders<Msg>) -> Model {
+fn init(url: Url, orders: &mut impl Orders<Msg>) -> Model {
     orders.subscribe(Msg::UrlChanged);
     Model {
         base_url: url.to_hash_base_url(),
@@ -118,7 +116,7 @@ enum Msg {
 // ------ ------
 fn update(msg: Msg, model: &mut Model, orders: &mut impl Orders<Msg>) {
     match msg {
-        Msg::UrlChanged(subs::UrlChanged(mut url)) => {
+        Msg::UrlChanged(subs::UrlChanged(url)) => {
             model.filter = Filter::from(url);
         }
         Msg::NewTodoTitleChanged(title) => {
