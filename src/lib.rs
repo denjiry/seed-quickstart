@@ -18,11 +18,6 @@ const STORAGE_KEY: &str = "todos-seed";
 // ------ ------
 fn init(mut url: Url, orders: &mut impl Orders<Msg>) -> Model {
     orders.subscribe(Msg::UrlChanged);
-    let filter = match url.remaining_hash_path_parts().as_slice() {
-        ["active"] => Filter::Active,
-        ["completed"] => Filter::Completed,
-        _ => Filter::All,
-    };
     Model {
         todos: LocalStorage::get(STORAGE_KEY).unwrap_or_default(),
         new_todo_title: String::new(),
